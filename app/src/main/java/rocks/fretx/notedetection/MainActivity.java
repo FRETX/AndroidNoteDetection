@@ -303,9 +303,11 @@ public class MainActivity extends AppCompatActivity {
                             public void run() {
                                 if(eventDisplayer.midiEvent instanceof NoteOn){
                                     NoteOn noteon = (NoteOn) eventDisplayer.midiEvent;
+                                    FretboardPosition fretboardPosition = midiNoteToFretboardPosition(noteon.getNoteValue());
                                     //Integer.toString(noteon.getNoteValue()) + "\n" +
                                     eventText.setText(midiNoteToName(noteon.getNoteValue()) + "\n" +
-                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz"
+                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
+                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
                                             );
 
                                 }
@@ -387,6 +389,18 @@ public class MainActivity extends AppCompatActivity {
         return (noteString[noteIndex] + Integer.toString(octave));
     }
 
-}
+    private FretboardPosition midiNoteToFretboardPosition(int note){
+        if(note < 40 || note > 68){
+            throw new IllegalArgumentException("This note is outside the display range of FretX");
+        }
+        if(note > 59){
+            note++;
+        }
+        int fret = (note - 40)%5;
+        int string = 6 - ((note - 40) / 5);
+        //This formula always prefers the open 2nd string to the 4th fret of the 3rd string
+        return new FretboardPosition(string,fret);
+    }
 
+}
 
