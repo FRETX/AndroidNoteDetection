@@ -49,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
     TextView tempoText;
     FretboardView fretboard;
 
+    private final double ERROR_THRESHOLD_IN_SEMITONES = 0.3;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -156,13 +158,6 @@ public class MainActivity extends AppCompatActivity {
                 i++;
             }
         }
-
-
-
-//        MidiTrack newTrack = midi.getTracks().get(0);
-//        newTrack = getOnlyNotes(newTrack);
-//        midi.removeTrack(0);
-//        midi.addTrack(newTrack);
 
     }
 
@@ -308,10 +303,23 @@ public class MainActivity extends AppCompatActivity {
                                     FretboardPosition fretboardPosition = midiNoteToFretboardPosition(noteon.getNoteValue());
                                     fretboard.setFretboardPosition(fretboardPosition);
 
+                                    float pitch = yin.medianPitch;
+                                    if(pitch > -1){
+                                        //TODO: Check with actual guitar
+                                        double currentNote = hzToMidiNote(pitch);
+                                        double difference = currentNote-Math.round(currentNote);
+                                        if(difference < ERROR_THRESHOLD_IN_SEMITONES){
+                                            fretboard.playingCorrectly = true;
+                                        }
+                                    } else{
+                                        fretboard.playingCorrectly = false;
+                                    }
+
                                     //Integer.toString(noteon.getNoteValue()) + "\n" +
-                                    eventText.setText(midiNoteToName(noteon.getNoteValue()) + "\n" +
-                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
-                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
+                                    eventText.setText("Target: " + midiNoteToName(noteon.getNoteValue()) + "\n" +
+//                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
+//                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
+                                            "You: "
                                             );
 
                                 }

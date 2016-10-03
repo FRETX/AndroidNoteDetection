@@ -20,6 +20,7 @@ public class FretboardView extends View {
     private final Paint paint = new Paint();
     private final int nStrings = 6;
     private String[] stringNames = {"E","B","G","D","A","E"};
+    public boolean playingCorrectly = false;
 
     private FretboardPosition fretboardPosition;
 
@@ -94,6 +95,7 @@ public class FretboardView extends View {
             canvas.drawCircle(width/2,stringHeights[fretboardPosition.getString()-1],dpToPixel(16),paint);
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.WHITE);
+            if(playingCorrectly) paint.setColor(Color.GREEN);
             canvas.drawCircle(width/2,stringHeights[fretboardPosition.getString()-1],dpToPixel(16),paint);
             paint.setColor(Color.RED);
             paint.setTextSize(dpToPixel(24));
