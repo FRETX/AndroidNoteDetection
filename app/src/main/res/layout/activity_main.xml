@@ -29,4 +29,8 @@
         android:textSize="36dp"
         android:id="@+id/eventText"
         android:text=""/>
+    <rocks.fretx.notedetection.FretboardView
+        android:id="@+id/fretboard"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
 </LinearLayout>

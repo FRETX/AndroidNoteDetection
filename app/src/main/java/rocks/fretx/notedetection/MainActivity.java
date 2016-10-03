@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     TextView eventText;
     SeekBar tempoSeek;
     TextView tempoText;
+    FretboardView fretboard;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
                 changeTempo(progress);
             }
         });
+        fretboard = (FretboardView) findViewById(R.id.fretboard);
 
         //MIDI
         loadMidi();
@@ -304,6 +306,8 @@ public class MainActivity extends AppCompatActivity {
                                 if(eventDisplayer.midiEvent instanceof NoteOn){
                                     NoteOn noteon = (NoteOn) eventDisplayer.midiEvent;
                                     FretboardPosition fretboardPosition = midiNoteToFretboardPosition(noteon.getNoteValue());
+                                    fretboard.setFretboardPosition(fretboardPosition);
+
                                     //Integer.toString(noteon.getNoteValue()) + "\n" +
                                     eventText.setText(midiNoteToName(noteon.getNoteValue()) + "\n" +
                                             new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
