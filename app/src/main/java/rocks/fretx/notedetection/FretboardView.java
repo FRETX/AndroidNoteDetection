@@ -9,7 +9,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 
@@ -37,16 +36,6 @@ public class FretboardView extends View {
         super(context, attrs, defStyle);
     }
 
-//    public void setCenterPitch(float centerPitch) {
-//        this.centerPitch = centerPitch;
-//        invalidate();
-//    }
-//
-//    public void setCurrentPitch(float currentPitch) {
-//        this.currentPitch = currentPitch;
-//        invalidate();
-//    }
-
     private float dpToPixel(int dp){
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
                 dp, getResources().getDisplayMetrics());
@@ -54,6 +43,7 @@ public class FretboardView extends View {
 
     public void setFretboardPosition(FretboardPosition fp){
         fretboardPosition = fp;
+        //if you don't invalidate your new data won't be drawn
         invalidate();
     }
 
@@ -88,7 +78,6 @@ public class FretboardView extends View {
         }
 
 
-
         if(fretboardPosition != null){
             paint.setStyle(Paint.Style.STROKE);
             paint.setColor(Color.BLACK);
@@ -101,19 +90,6 @@ public class FretboardView extends View {
             paint.setTextSize(dpToPixel(24));
             canvas.drawText(Integer.toString(fretboardPosition.getFret()),(width/2)-dpToPixel(6),stringHeights[fretboardPosition.getString()-1]+dpToPixel(6),paint);
         }
-
-
-//        float halfWidth = width / 2;
-//        paint.setStrokeWidth(6.0f);
-//        paint.setColor(Color.BLUE);
-//        canvas.drawLine(halfWidth, 0, halfWidth, height, paint);
-//
-//
-//        canvas.drawLine(halfWidth, height,
-//                halfWidth + (float)Math.sin(angleOfIndicator) * height * 0.9f,
-//                height - (float)Math.cos(Math.abs(angleOfIndicator)) * height * 0.9f, paint);
-
-
 
     }
 

@@ -15,19 +15,14 @@ import android.widget.Toast;
 import com.pdrogfer.mididroid.MidiFile;
 import com.pdrogfer.mididroid.MidiTrack;
 import com.pdrogfer.mididroid.event.MidiEvent;
-import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.event.meta.Tempo;
-import com.pdrogfer.mididroid.examples.EventPrinter;
 import com.pdrogfer.mididroid.util.MidiProcessor;
 
-import java.io.File;
+
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -51,12 +46,67 @@ public class MainActivity extends AppCompatActivity {
 
     private final double ERROR_THRESHOLD_IN_SEMITONES = 0.3;
 
+    //Activity Lifecycle
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         //GUI
+        initGui();
+
+        //MIDI Stuff
+        loadMidi();
+        //TODO: Proper MIDI file picker
+            //Create a new MidiProcessor:
+        processor = new MidiProcessor(midi);
+            //Register for the events you're interested in:
+        eventDisplayer = new EventDisplayer(this);
+        processor.registerEventListener(eventDisplayer, MidiEvent.class);
+
+    }
+
+    protected void onStart(){
+        super.onStart();
+        Log.d("onStart","method called");
+    }
+
+    protected void onStop(){
+        super.onStop();
+        Log.d("onStop","method called");
+//        stopProcessing();
+        //TODO: pause/destroy? audio thread
+    }
+
+    protected void onPause(){
+        super.onPause();
+        Log.d("onPause","method called");
+//        stopProcessing();
+    }
+
+    protected void onResume(){
+        //TODO: For some reason this doesn't get called when you switch apps
+        //Only gets called when the app is created for the first time
+        super.onResume();
+        Log.d("onResume","method called");
+        //Ask for runtime permissions
+        boolean permissionsGranted = askForPermissions();
+        Log.d("onResume","permissionsGranted: " + permissionsGranted);
+        if(permissionsGranted) {
+            Log.d("onResume","resuming");
+            startProcessing();
+        }
+
+        //TODO: resume/restart? audio thread
+    }
+
+    protected void onDestroy(){
+        super.onDestroy();
+        Log.d("onDestroy","method called");
+        stopProcessing();
+    }
+
+    //GUI
+    private void initGui(){
         eventText = (TextView) findViewById(R.id.eventText);
         tempoSeek = (SeekBar) findViewById(R.id.tempoSeek);
         tempoSeek.setMax(200);
@@ -84,40 +134,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         fretboard = (FretboardView) findViewById(R.id.fretboard);
-
-        //MIDI
-        loadMidi();
-
-//         Create a new MidiProcessor:
-        processor = new MidiProcessor(midi);
-
-//         Register for the events you're interested in:
-
-        eventDisplayer = new EventDisplayer(this);
-        processor.registerEventListener(eventDisplayer, MidiEvent.class);
-
-
-
-
     }
 
-    private void changeTempo(int targetTempoPercentage){
-        MidiTrack tempoTrack = midi.getTracks().get(0);
-        Iterator<MidiEvent> it = tempoTrack.getEvents().iterator();
-        int i = 0;
-        while(it.hasNext())
-        {
-            MidiEvent event = it.next();
-            if(event instanceof Tempo)
-            {
-                Tempo tempoEvent = (Tempo)event;
-                tempoEvent.setBpm(originalBpms[i]*(float)targetTempoPercentage/100);
-                i++;
-            }
-        }
-
-    }
-
+    //MIDI
     private void loadMidi(){
         InputStream is = getResources().openRawResource(R.raw.sample_midi);
         try {
@@ -161,106 +180,51 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    protected void onStart(){
-        super.onStart();
-        Log.d("onStart","method called");
-    }
-
-
-    protected void onStop(){
-        super.onStop();
-        Log.d("onStop","method called");
-//        stopProcessing();
-        //TODO: pause/destroy? audio thread
-    }
-
-    protected void onPause(){
-        super.onPause();
-        Log.d("onPause","method called");
-//        stopProcessing();
-    }
-
-    protected void onResume(){
-        //TODO: For some reason this doesn't get called when you switch apps
-        //Only gets called when the app is created for the first time
-        super.onResume();
-        Log.d("onResume","method called");
-        //Ask for runtime permissions
-        boolean permissionsGranted = askForPermissions();
-        Log.d("onResume","permissionsGranted: " + permissionsGranted);
-        if(permissionsGranted) {
-            Log.d("onResume","resuming");
-            startProcessing();
-        }
-
-        //TODO: resume/restart? audio thread
-    }
-
-    protected void onDestroy(){
-        super.onDestroy();
-        Log.d("onDestroy","method called");
-        stopProcessing();
-
-    }
-
-
-
-
-    private MidiTrack getOnlyNotes(MidiTrack track){
-        //Remove any event that is not a note
-        Iterator<MidiEvent> it = track.getEvents().iterator();
-        List<MidiEvent> eventsToRemove = new ArrayList<MidiEvent>();
-
+    private void changeTempo(int targetTempoPercentage){
+        MidiTrack tempoTrack = midi.getTracks().get(0);
+        Iterator<MidiEvent> it = tempoTrack.getEvents().iterator();
+        int i = 0;
         while(it.hasNext())
         {
             MidiEvent event = it.next();
-
-            if(!(event instanceof NoteOn) && !(event instanceof NoteOff))
+            if(event instanceof Tempo)
             {
-                eventsToRemove.add(event);
+                Tempo tempoEvent = (Tempo)event;
+                tempoEvent.setBpm(originalBpms[i]*(float)targetTempoPercentage/100);
+                i++;
             }
         }
 
-        for(MidiEvent event : eventsToRemove)
-        {
-            track.removeEvent(event);
-        }
-
-        return track;
     }
 
-    //Permissions
-    private boolean askForPermissions(){
-        int result = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
-        if (result == PackageManager.PERMISSION_GRANTED){
-            return true;
-        } else {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.RECORD_AUDIO)){
-                //If the user has denied the permission previously your code will come to this block
-                //Here you can explain why you need this permission
-                //Explain here why you need this permission
-            }
-            //And finally ask for the permission
-            ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_CODE_RECORD_AUDIO);
-            return false;
-        }
+    public double midiNoteToHz(int midiNote){
+        return Math.pow(2, ((double)midiNote - 69)/12)*440;
     }
 
-    //This method will be called when the user will tap on allow or deny
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        //Checking the request code of our request
-        if(requestCode == PERMISSION_CODE_RECORD_AUDIO){
-            //If permission is granted
-            if(grantResults.length >0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                startProcessing();
-            }else{
-                //Displaying another toast if permission is not granted
-                Toast.makeText(this,"FretX Note Detector cannot work without this permission. Restart the app to ask for it again.", Toast.LENGTH_LONG).show();
-            }
-        }
+    public double hzToMidiNote(double hertz){
+
+        return 69 + (12 * Math.log(hertz/440)/Math.log(2)) ;
     }
 
+    public String midiNoteToName(int midiNote){
+        String[] noteString = new String[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        int octave = (midiNote / 12) - 1;
+        int noteIndex = (midiNote % 12);
+        return (noteString[noteIndex] + Integer.toString(octave));
+    }
+
+    private FretboardPosition midiNoteToFretboardPosition(int note){
+        if(note < 40 || note > 68){
+            throw new IllegalArgumentException("This note is outside the display range of FretX");
+        }
+        if(note > 59){
+            note++;
+        }
+        int fret = (note - 40)%5;
+        int string = 6 - ((note - 40) / 5);
+        //This formula always prefers the open 2nd string to the 4th fret of the 3rd string
+        return new FretboardPosition(string,fret);
+    }
 
 
     //Processing handlers
@@ -341,6 +305,17 @@ public class MainActivity extends AppCompatActivity {
         processor.start();
     }
 
+    private void startProcessing(){
+        Log.d("startProcessing","method called");
+        if(!processingIsRunning){
+            startAudioThread();
+            startGuiThread();
+            processingIsRunning = true;
+            Log.d("startProcessing","processes started");
+        }
+
+    }
+
     private void stopProcessing(){
         Log.d("stopProcessing","method called");
         if(processingIsRunning){
@@ -373,46 +348,39 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void startProcessing(){
-        Log.d("startProcessing","method called");
-        if(!processingIsRunning){
-            startAudioThread();
-            startGuiThread();
-            processingIsRunning = true;
-            Log.d("startProcessing","processes started");
+
+    //Permissions
+    private boolean askForPermissions(){
+        int result = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO);
+        if (result == PackageManager.PERMISSION_GRANTED){
+            return true;
+        } else {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,Manifest.permission.RECORD_AUDIO)){
+                //If the user has denied the permission previously your code will come to this block
+                //Here you can explain why you need this permission
+                //Explain here why you need this permission
+            }
+            //And finally ask for the permission
+            ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSION_CODE_RECORD_AUDIO);
+            return false;
         }
-
     }
 
-    //Utility
-    public double midiNoteToHz(int midiNote){
-        return Math.pow(2, ((double)midiNote - 69)/12)*440;
-    }
-
-    public double hzToMidiNote(double hertz){
-
-        return 69 + (12 * Math.log(hertz/440)/Math.log(2)) ;
-    }
-
-    public String midiNoteToName(int midiNote){
-        String[] noteString = new String[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-        int octave = (midiNote / 12) - 1;
-        int noteIndex = (midiNote % 12);
-        return (noteString[noteIndex] + Integer.toString(octave));
-    }
-
-    private FretboardPosition midiNoteToFretboardPosition(int note){
-        if(note < 40 || note > 68){
-            throw new IllegalArgumentException("This note is outside the display range of FretX");
+    //This method will be called when the user will tap on allow or deny
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        //Checking the request code of our request
+        if(requestCode == PERMISSION_CODE_RECORD_AUDIO){
+            //If permission is granted
+            if(grantResults.length >0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                startProcessing();
+            }else{
+                //Displaying another toast if permission is not granted
+                Toast.makeText(this,"FretX Note Detector cannot work without this permission. Restart the app to ask for it again.", Toast.LENGTH_LONG).show();
+            }
         }
-        if(note > 59){
-            note++;
-        }
-        int fret = (note - 40)%5;
-        int string = 6 - ((note - 40) / 5);
-        //This formula always prefers the open 2nd string to the 4th fret of the 3rd string
-        return new FretboardPosition(string,fret);
     }
+
 
 }
 
