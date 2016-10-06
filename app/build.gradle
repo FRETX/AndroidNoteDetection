@@ -1,6 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
+    signingConfigs {
+        devbuild {
+            keyAlias 'fretxbabacandev'
+            keyPassword 'endles2swyrm9'
+            storeFile file('/Users/Work/keystores/android.jks')
+            storePassword 'endles2swyrm9'
+        }
+    }
     compileSdkVersion 24
     buildToolsVersion "24.0.2"
     defaultConfig {

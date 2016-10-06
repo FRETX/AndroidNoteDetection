@@ -38,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
     MidiProcessor processor;
     EventDisplayer eventDisplayer;
     float [] originalBpms;
+    int currentMidiNote;
 
     TextView eventText;
     SeekBar tempoSeek;
@@ -264,29 +265,29 @@ public class MainActivity extends AppCompatActivity {
                             public void run() {
                                 if(eventDisplayer.midiEvent instanceof NoteOn){
                                     NoteOn noteon = (NoteOn) eventDisplayer.midiEvent;
+                                    currentMidiNote = noteon.getNoteValue();
                                     FretboardPosition fretboardPosition = midiNoteToFretboardPosition(noteon.getNoteValue());
                                     fretboard.setFretboardPosition(fretboardPosition);
-
-                                    float pitch = yin.medianPitch;
-                                    if(pitch > -1){
-                                        //TODO: Check with actual guitar
-                                        double currentNote = hzToMidiNote(pitch);
-                                        double difference = currentNote-Math.round(currentNote);
-                                        if(difference < ERROR_THRESHOLD_IN_SEMITONES){
-                                            fretboard.playingCorrectly = true;
-                                        }
-                                    } else{
-                                        fretboard.playingCorrectly = false;
-                                    }
-
                                     //Integer.toString(noteon.getNoteValue()) + "\n" +
                                     eventText.setText("Target: " + midiNoteToName(noteon.getNoteValue()) + "\n" +
 //                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
 //                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
                                             "You: "
                                             );
-
                                 }
+
+                                float pitch = yin.medianPitch;
+                                if(pitch > -1){
+                                    //TODO: Check with actual guitar
+                                    double playedNote = hzToMidiNote(pitch);
+                                    double difference = Math.abs(currentMidiNote-playedNote);
+                                    if(difference < ERROR_THRESHOLD_IN_SEMITONES){
+                                        fretboard.playingCorrectly = true;
+                                    }
+                                } else{
+                                    fretboard.playingCorrectly = false;
+                                }
+
 
 //                                float pitch = yin.result.getPitch();
 //                                if(pitch == -1){
