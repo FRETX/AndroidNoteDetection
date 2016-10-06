@@ -15,6 +15,7 @@ import android.widget.Toast;
 import com.pdrogfer.mididroid.MidiFile;
 import com.pdrogfer.mididroid.MidiTrack;
 import com.pdrogfer.mididroid.event.MidiEvent;
+import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.event.meta.Tempo;
 import com.pdrogfer.mididroid.util.MidiProcessor;
@@ -22,6 +23,7 @@ import com.pdrogfer.mididroid.util.MidiProcessor;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Iterator;
 
 
@@ -39,8 +41,11 @@ public class MainActivity extends AppCompatActivity {
     EventDisplayer eventDisplayer;
     float [] originalBpms;
     int currentMidiNote;
+    int totalTicks = 0;
+    int correctTicks = 0;
 
     TextView eventText;
+    TextView correctText;
     SeekBar tempoSeek;
     TextView tempoText;
     FretboardView fretboard;
@@ -109,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
     //GUI
     private void initGui(){
         eventText = (TextView) findViewById(R.id.eventText);
+        correctText = (TextView) findViewById(R.id.correctText);
         tempoSeek = (SeekBar) findViewById(R.id.tempoSeek);
         tempoSeek.setMax(200);
         tempoSeek.setProgress(100);
@@ -263,6 +269,17 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
+                                if(eventDisplayer.midiEvent instanceof NoteOff){
+                                    NoteOff noteoff = (NoteOff) eventDisplayer.midiEvent;
+                                    int removeNote = noteoff.getNoteValue();
+                                    if(currentMidiNote == removeNote){
+                                        currentMidiNote = -1;
+                                        fretboard.playingCorrectly = false;
+                                    } else {
+                                        //This shouldn't happen, we only use monophonic MIDI tracks for this part of the app
+                                    }
+                                }
+
                                 if(eventDisplayer.midiEvent instanceof NoteOn){
                                     NoteOn noteon = (NoteOn) eventDisplayer.midiEvent;
                                     currentMidiNote = noteon.getNoteValue();
@@ -277,17 +294,26 @@ public class MainActivity extends AppCompatActivity {
                                 }
 
                                 float pitch = yin.medianPitch;
-                                if(pitch > -1){
-                                    //TODO: Check with actual guitar
-                                    double playedNote = hzToMidiNote(pitch);
-                                    double difference = Math.abs(currentMidiNote-playedNote);
-                                    if(difference < ERROR_THRESHOLD_IN_SEMITONES){
-                                        fretboard.playingCorrectly = true;
+
+                                if(currentMidiNote > -1){
+                                    totalTicks++;
+                                    if(pitch > -1){
+                                        //TODO: Check with actual guitar
+                                        double playedNote = hzToMidiNote(pitch);
+                                        double difference = Math.abs(currentMidiNote-playedNote);
+                                        if(difference < ERROR_THRESHOLD_IN_SEMITONES){
+                                            fretboard.playingCorrectly = true;
+                                            correctTicks++;
+                                            eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
+                                                            "You: " + midiNoteToName(Math.round((float)playedNote))
+                                            );
+                                        }
+                                    } else{
+                                        fretboard.playingCorrectly = false;
                                     }
-                                } else{
-                                    fretboard.playingCorrectly = false;
                                 }
 
+                                correctText.setText(Integer.toString((int)Math.ceil((float)correctTicks / (float)totalTicks * 100)) + "%");
 
 //                                float pitch = yin.result.getPitch();
 //                                if(pitch == -1){
@@ -342,6 +368,9 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
                 guiThread = null;
+            }
+            if(processor != null){
+                processor.stop();
             }
             processingIsRunning = false;
             Log.d("stopProcessing","processes stopped");

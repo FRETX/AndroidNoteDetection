@@ -29,6 +29,13 @@
         android:textSize="36dp"
         android:id="@+id/eventText"
         android:text=""/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/correctText"
+        android:textSize="24sp"/>
+
     <rocks.fretx.notedetection.FretboardView
         android:id="@+id/fretboard"
         android:layout_width="match_parent"

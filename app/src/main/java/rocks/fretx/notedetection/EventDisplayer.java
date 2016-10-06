@@ -39,7 +39,7 @@ public class EventDisplayer implements MidiEventListener
     @Override
     public void onEvent(MidiEvent event, long ms)
     {
-//        System.out.println("Received event: " + event + " | " + Long.toString(ms));
+        System.out.println("Received event: " + event + " | " + Long.toString(ms));
         midiEvent = event;
         time = ms;
 
