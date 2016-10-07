@@ -5,18 +5,22 @@ import android.content.Context;
 import android.widget.TextView;
 
 import com.pdrogfer.mididroid.event.MidiEvent;
+import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.util.MidiEventListener;
 
 /**
  * Created by Onur Babacan on 10/3/16.
  */
 
+//TODO:Rename this class accordingly
+
 // This class will print any event it receives to the console
 public class EventDisplayer implements MidiEventListener
 {
-    protected MidiEvent midiEvent;
+    private NoteOn noteOn;
     protected long time;
     private MainActivity main;
+    protected boolean newNoteArrived;
 
     public EventDisplayer(MainActivity ma)
     {
@@ -39,10 +43,22 @@ public class EventDisplayer implements MidiEventListener
     @Override
     public void onEvent(MidiEvent event, long ms)
     {
-        System.out.println("Received event: " + event + " | " + Long.toString(ms));
-        midiEvent = event;
-        time = ms;
+//        System.out.println("Received event: " + event + " | " + Long.toString(ms));
 
+        time = ms;
+        if(event instanceof NoteOn){
+            System.out.println("Received event: " + event + " | " + Long.toString(ms));
+            noteOn = (NoteOn) event;
+            newNoteArrived = true;
+        }
+
+
+    }
+
+    public NoteOn getNote(){
+        //should reading the data reset the noteOn value?
+        newNoteArrived = false;
+        return noteOn;
     }
 
     @Override

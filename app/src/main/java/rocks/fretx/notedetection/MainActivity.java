@@ -2,12 +2,14 @@ package rocks.fretx.notedetection;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.os.CountDownTimer;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.WindowManager;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -18,13 +20,17 @@ import com.pdrogfer.mididroid.event.MidiEvent;
 import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.event.meta.Tempo;
+import com.pdrogfer.mididroid.event.meta.TimeSignature;
 import com.pdrogfer.mididroid.util.MidiProcessor;
 
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
+import java.util.TreeSet;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -50,13 +56,21 @@ public class MainActivity extends AppCompatActivity {
     TextView tempoText;
     FretboardView fretboard;
 
-    private final double ERROR_THRESHOLD_IN_SEMITONES = 0.3;
+    CountDownTimer countDownTimer;
+    long timeLeftForCorrectNote = -1;
+    boolean correctNoteLock;
+
+    private final double ERROR_THRESHOLD_IN_SEMITONES = 0.1;
+
+    //TODO: NoteOff events
+    //TODO: metronome
 
     //Activity Lifecycle
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         //GUI
         initGui();
 
@@ -68,6 +82,17 @@ public class MainActivity extends AppCompatActivity {
             //Register for the events you're interested in:
         eventDisplayer = new EventDisplayer(this);
         processor.registerEventListener(eventDisplayer, MidiEvent.class);
+
+        countDownTimer = new CountDownTimer(500, 10) {
+
+            public void onTick(long millisUntilFinished) {
+                timeLeftForCorrectNote = millisUntilFinished;
+            }
+
+            public void onFinish() {
+                timeLeftForCorrectNote = -1;
+            }
+        };
 
     }
 
@@ -145,19 +170,85 @@ public class MainActivity extends AppCompatActivity {
 
     //MIDI
     private void loadMidi(){
-        InputStream is = getResources().openRawResource(R.raw.sample_midi);
-        try {
-            midi = new MidiFile(is);
-        } catch (IOException e) {
-            Log.d("onCreate","MIDI file could not be read");
-            e.printStackTrace();
-        }
-        if(midi != null){
-            Log.d("onCreate","MIDI file read");
+
+//        InputStream is = getResources().openRawResource(R.raw.sample_midi);
+//        try {
+//            midi = new MidiFile(is);
+//        } catch (IOException e) {
+//            Log.d("onCreate","MIDI file could not be read");
+//            e.printStackTrace();
+//        }
+//        if(midi != null){
+//            Log.d("onCreate","MIDI file read");
+//        }
+
+        //Possible MIDI sterilization code
+//        int maxEvents = -1;
+//        MidiTrack selectedTrack = new MidiTrack();
+//        for (int i = 0; i < midi.getTrackCount(); i++) {
+//            if(midi.getTracks().get(i).getEventCount() > maxEvents){
+//                selectedTrack = midi.getTracks().get(i);
+//                maxEvents = midi.getTracks().get(i).getEventCount();
+//            }
+//        }
+//
+//        Iterator<MidiEvent> it = selectedTrack.getEvents().iterator();
+//        while(it.hasNext()){
+//            MidiEvent event = it.next();
+//            int note = 40;
+//            if(event instanceof NoteOn){
+//                note = ((NoteOn) event).getNoteValue();
+//            }
+//            if(event instanceof NoteOff){
+//                note = ((NoteOff) event).getNoteValue();
+//            }
+//
+//            if(note < 40 || note > 68){
+//                it.remove();
+//            }
+//        }
+//
+            //Don't remove track 0 because it's the tempo track
+//        for (int i = midi.getTrackCount() - 1; i > 0; i--) {
+//            midi.removeTrack(i);
+//        }
+//
+//        midi.addTrack(selectedTrack);
+
+
+        //Alternatively we can procedurally generate a MIDI file
+        MidiTrack tempoTrack = new MidiTrack();
+        MidiTrack noteTrack = new MidiTrack();
+        TimeSignature ts = new TimeSignature();
+        ts.setTimeSignature(4, 4, TimeSignature.DEFAULT_METER, TimeSignature.DEFAULT_DIVISION);
+        Tempo tempo = new Tempo();
+        tempo.setBpm(60);
+        tempoTrack.insertEvent(ts);
+        tempoTrack.insertEvent(tempo);
+
+
+        for(int i = 0; i < 29; i++)
+        {
+            int channel = 0;
+            int pitch = 40 + i;
+            int velocity = 100;
+            long tick = i * 480;
+            long duration = 120;
+
+            noteTrack.insertEvent(new NoteOn(tick, channel, pitch, velocity));
+            noteTrack.insertEvent(new NoteOff(tick+duration, channel, pitch, 0));
         }
 
-        //Store all the tempo changes - probably unnecessary but no technical debt
-        MidiTrack tempoTrack = midi.getTracks().get(0);
+        ArrayList<MidiTrack> tracks = new ArrayList<MidiTrack>();
+        tracks.add(tempoTrack);
+        tracks.add(noteTrack);
+
+        midi = new MidiFile(MidiFile.DEFAULT_RESOLUTION, tracks);
+
+
+
+        //Store all the tempo changes - probably unnecessary but no technical debt for future file loading
+        tempoTrack = midi.getTracks().get(0);
         Iterator<MidiEvent> it = tempoTrack.getEvents().iterator();
         int tempoEventCount = 0;
         while(it.hasNext())
@@ -188,6 +279,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void changeTempo(int targetTempoPercentage){
+        processor.stop();
+
         MidiTrack tempoTrack = midi.getTracks().get(0);
         Iterator<MidiEvent> it = tempoTrack.getEvents().iterator();
         int i = 0;
@@ -201,6 +294,9 @@ public class MainActivity extends AppCompatActivity {
                 i++;
             }
         }
+
+        processor.reset();
+        processor.start();
 
     }
 
@@ -269,51 +365,57 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                if(eventDisplayer.midiEvent instanceof NoteOff){
-                                    NoteOff noteoff = (NoteOff) eventDisplayer.midiEvent;
-                                    int removeNote = noteoff.getNoteValue();
-                                    if(currentMidiNote == removeNote){
-                                        currentMidiNote = -1;
-                                        fretboard.playingCorrectly = false;
-                                    } else {
-                                        //This shouldn't happen, we only use monophonic MIDI tracks for this part of the app
-                                    }
-                                }
+//                                if(eventDisplayer.midiEvent instanceof NoteOff){
+//                                    NoteOff noteoff = (NoteOff) eventDisplayer.midiEvent;
+//                                    int removeNote = noteoff.getNoteValue();
+//                                    if(currentMidiNote == removeNote){
+//                                        currentMidiNote = -1;
+//                                        fretboard.playingCorrectly = false;
+//                                    } else {
+//                                        //This shouldn't happen, we only use monophonic MIDI tracks for this part of the app
+//                                    }
+//                                }
 
-                                if(eventDisplayer.midiEvent instanceof NoteOn){
-                                    NoteOn noteon = (NoteOn) eventDisplayer.midiEvent;
+                                //TODO:There's a small chance eventDisplayer.midiEvent changes to e.g. Metronome before you can copy & cast it as NoteOn and the app crashes
+                                //
+                                if(eventDisplayer.newNoteArrived){
+                                    NoteOn noteon = eventDisplayer.getNote();
                                     currentMidiNote = noteon.getNoteValue();
-                                    FretboardPosition fretboardPosition = midiNoteToFretboardPosition(noteon.getNoteValue());
+                                    FretboardPosition fretboardPosition = midiNoteToFretboardPosition(currentMidiNote);
                                     fretboard.setFretboardPosition(fretboardPosition);
                                     //Integer.toString(noteon.getNoteValue()) + "\n" +
                                     eventText.setText("Target: " + midiNoteToName(noteon.getNoteValue()) + "\n" +
 //                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
 //                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
-                                            "You: "
-                                            );
+                                                    "You: ");
+                                    totalTicks++;
+                                    correctNoteLock = true;
+                                    countDownTimer.start();
+
                                 }
 
                                 float pitch = yin.medianPitch;
-
                                 if(currentMidiNote > -1){
-                                    totalTicks++;
                                     if(pitch > -1){
                                         //TODO: Check with actual guitar
                                         double playedNote = hzToMidiNote(pitch);
                                         double difference = Math.abs(currentMidiNote-playedNote);
-                                        if(difference < ERROR_THRESHOLD_IN_SEMITONES){
+                                        if(difference < ERROR_THRESHOLD_IN_SEMITONES && timeLeftForCorrectNote > 0 && correctNoteLock){
                                             fretboard.playingCorrectly = true;
                                             correctTicks++;
-                                            eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
-                                                            "You: " + midiNoteToName(Math.round((float)playedNote))
-                                            );
+                                            correctNoteLock = false;
                                         }
+
+                                        eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
+                                                "You: " + midiNoteToName(Math.round((float)playedNote))
+                                        );
                                     } else{
                                         fretboard.playingCorrectly = false;
                                     }
                                 }
 
-                                correctText.setText(Integer.toString((int)Math.ceil((float)correctTicks / (float)totalTicks * 100)) + "%");
+                                //correctText.setText(Integer.toString((int)Math.ceil((float)correctTicks / (float)totalTicks * 100)) + "%");
+                                correctText.setText(Integer.toString(correctTicks)+ "/" + Integer.toString(totalTicks) + " notes correctly played");
 
 //                                float pitch = yin.result.getPitch();
 //                                if(pitch == -1){
@@ -328,8 +430,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
-        guiThread.start();
         processor.start();
+        //TODO: MidiProcessor spawns a new thread with no reference everytime you call this, so those threads can't be killed
+        guiThread.start();
+
     }
 
     private void startProcessing(){
