@@ -13,6 +13,14 @@
     tools:context="rocks.fretx.notedetection.MainActivity">
 
     <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/metronomeText"
+        android:textSize="30sp"
+        android:textAlignment="center"
+        android:textStyle="normal|bold"/>
+
+    <TextView
         android:id="@+id/tempoText"
         android:textSize="24dp"
         android:text="Tempo: "
@@ -34,6 +42,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/correctText"
+        android:textSize="24sp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/mistakeText"
         android:textSize="24sp"/>
 
     <rocks.fretx.notedetection.FretboardView

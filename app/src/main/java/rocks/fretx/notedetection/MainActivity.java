@@ -21,16 +21,12 @@ import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
 import com.pdrogfer.mididroid.event.meta.Tempo;
 import com.pdrogfer.mididroid.event.meta.TimeSignature;
+import com.pdrogfer.mididroid.util.MetronomeTick;
 import com.pdrogfer.mididroid.util.MidiProcessor;
 
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
-import java.util.TreeSet;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -47,20 +43,26 @@ public class MainActivity extends AppCompatActivity {
     EventDisplayer eventDisplayer;
     float [] originalBpms;
     int currentMidiNote;
-    int totalTicks = 0;
-    int correctTicks = 0;
+    int totalNotes = 0;
+    int correctNotes = 0;
+    int mistakes = 0;
 
     TextView eventText;
     TextView correctText;
+    TextView mistakeText;
+    TextView metronomeText;
     SeekBar tempoSeek;
     TextView tempoText;
     FretboardView fretboard;
 
-    CountDownTimer countDownTimer;
+    CountDownTimer noteTimer;
+    CountDownTimer metronomeTimer;
     long timeLeftForCorrectNote = -1;
     boolean correctNoteLock;
+    boolean mistakeLock = true;
 
-    private final double ERROR_THRESHOLD_IN_SEMITONES = 0.1;
+    private final double ERROR_THRESHOLD_IN_SEMITONES = 0.5;
+    private final long CORRECT_NOTE_COUNTDOWN = 400;
 
     //TODO: NoteOff events
     //TODO: metronome
@@ -83,14 +85,24 @@ public class MainActivity extends AppCompatActivity {
         eventDisplayer = new EventDisplayer(this);
         processor.registerEventListener(eventDisplayer, MidiEvent.class);
 
-        countDownTimer = new CountDownTimer(500, 10) {
-
+        noteTimer = new CountDownTimer(CORRECT_NOTE_COUNTDOWN, 10) {
             public void onTick(long millisUntilFinished) {
                 timeLeftForCorrectNote = millisUntilFinished;
             }
-
             public void onFinish() {
                 timeLeftForCorrectNote = -1;
+            }
+        };
+
+        metronomeTimer = new CountDownTimer(100,100) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+
+            }
+
+            @Override
+            public void onFinish() {
+                metronomeText.setText("");
             }
         };
 
@@ -140,6 +152,9 @@ public class MainActivity extends AppCompatActivity {
     private void initGui(){
         eventText = (TextView) findViewById(R.id.eventText);
         correctText = (TextView) findViewById(R.id.correctText);
+        mistakeText = (TextView) findViewById(R.id.mistakeText);
+        metronomeText = (TextView) findViewById(R.id.metronomeText);
+
         tempoSeek = (SeekBar) findViewById(R.id.tempoSeek);
         tempoSeek.setMax(200);
         tempoSeek.setProgress(100);
@@ -166,6 +181,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         fretboard = (FretboardView) findViewById(R.id.fretboard);
+        mistakeText.setText("Added mistakes: " + Integer.toString(mistakes));
     }
 
     //MIDI
@@ -378,20 +394,36 @@ public class MainActivity extends AppCompatActivity {
 
                                 //TODO:There's a small chance eventDisplayer.midiEvent changes to e.g. Metronome before you can copy & cast it as NoteOn and the app crashes
                                 //
-                                if(eventDisplayer.newNoteArrived){
-                                    NoteOn noteon = eventDisplayer.getNote();
+
+                                if(eventDisplayer.newMetronomeTickArrived){
+                                    MetronomeTick metronomeTick = eventDisplayer.getMetronomeTick();
+                                    metronomeText.setText("x");
+                                    metronomeTimer.start();
+                                }
+
+                                if(eventDisplayer.newNoteOnArrived){
+                                    NoteOn noteon = eventDisplayer.getNoteOn();
                                     currentMidiNote = noteon.getNoteValue();
                                     FretboardPosition fretboardPosition = midiNoteToFretboardPosition(currentMidiNote);
                                     fretboard.setFretboardPosition(fretboardPosition);
+                                    fretboard.drawNotes = true;
                                     //Integer.toString(noteon.getNoteValue()) + "\n" +
                                     eventText.setText("Target: " + midiNoteToName(noteon.getNoteValue()) + "\n" +
 //                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
 //                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
                                                     "You: ");
-                                    totalTicks++;
+                                    totalNotes++;
                                     correctNoteLock = true;
-                                    countDownTimer.start();
+                                    noteTimer.start();
 
+                                }
+                                if(eventDisplayer.newNoteOffArrived){
+                                    mistakeLock = true;
+                                    NoteOff noteoff = eventDisplayer.getNoteOff();
+                                    if(currentMidiNote == noteoff.getNoteValue()){
+                                        currentMidiNote = -1;
+                                        fretboard.drawNotes = false;
+                                    }
                                 }
 
                                 float pitch = yin.medianPitch;
@@ -401,8 +433,9 @@ public class MainActivity extends AppCompatActivity {
                                         double playedNote = hzToMidiNote(pitch);
                                         double difference = Math.abs(currentMidiNote-playedNote);
                                         if(difference < ERROR_THRESHOLD_IN_SEMITONES && timeLeftForCorrectNote > 0 && correctNoteLock){
-                                            fretboard.playingCorrectly = true;
-                                            correctTicks++;
+                                            //fretboard.playingCorrectly = true;
+                                            //TODO: make it flash green for a small amount of time
+                                            correctNotes++;
                                             correctNoteLock = false;
                                         }
 
@@ -410,12 +443,18 @@ public class MainActivity extends AppCompatActivity {
                                                 "You: " + midiNoteToName(Math.round((float)playedNote))
                                         );
                                     } else{
-                                        fretboard.playingCorrectly = false;
+                                        //fretboard.playingCorrectly = false;
                                     }
                                 }
 
-                                //correctText.setText(Integer.toString((int)Math.ceil((float)correctTicks / (float)totalTicks * 100)) + "%");
-                                correctText.setText(Integer.toString(correctTicks)+ "/" + Integer.toString(totalTicks) + " notes correctly played");
+                                if(currentMidiNote == -1 && pitch > -1 && mistakeLock){
+                                    mistakes++;
+                                    mistakeLock = false;
+                                    mistakeText.setText("Added mistakes: " + Integer.toString(mistakes));
+                                }
+
+                                //correctText.setText(Integer.toString((int)Math.ceil((float)correctNotes / (float)totalNotes * 100)) + "%");
+                                correctText.setText(Integer.toString(correctNotes)+ "/" + Integer.toString(totalNotes) + " notes correctly played");
 
 //                                float pitch = yin.result.getPitch();
 //                                if(pitch == -1){

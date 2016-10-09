@@ -5,7 +5,9 @@ import android.content.Context;
 import android.widget.TextView;
 
 import com.pdrogfer.mididroid.event.MidiEvent;
+import com.pdrogfer.mididroid.event.NoteOff;
 import com.pdrogfer.mididroid.event.NoteOn;
+import com.pdrogfer.mididroid.util.MetronomeTick;
 import com.pdrogfer.mididroid.util.MidiEventListener;
 
 /**
@@ -18,9 +20,11 @@ import com.pdrogfer.mididroid.util.MidiEventListener;
 public class EventDisplayer implements MidiEventListener
 {
     private NoteOn noteOn;
+    private NoteOff noteOff;
+    private MetronomeTick metronomeTick;
     protected long time;
     private MainActivity main;
-    protected boolean newNoteArrived;
+    protected boolean newNoteOnArrived, newNoteOffArrived, newMetronomeTickArrived;
 
     public EventDisplayer(MainActivity ma)
     {
@@ -43,22 +47,42 @@ public class EventDisplayer implements MidiEventListener
     @Override
     public void onEvent(MidiEvent event, long ms)
     {
-//        System.out.println("Received event: " + event + " | " + Long.toString(ms));
+
 
         time = ms;
+        if(event instanceof MetronomeTick){
+//            System.out.println("Received event: " + event + " | " + Long.toString(ms));
+            newMetronomeTickArrived = true;
+            metronomeTick = (MetronomeTick) event;
+        }
         if(event instanceof NoteOn){
-            System.out.println("Received event: " + event + " | " + Long.toString(ms));
+//            System.out.println("Received event: " + event + " | " + Long.toString(ms));
             noteOn = (NoteOn) event;
-            newNoteArrived = true;
+            newNoteOnArrived = true;
+        }
+        if(event instanceof NoteOff){
+//            System.out.println("Received event: " + event + " | " + Long.toString(ms));
+            noteOff = (NoteOff) event;
+            newNoteOffArrived = true;
         }
 
 
     }
 
-    public NoteOn getNote(){
+    public NoteOn getNoteOn(){
         //should reading the data reset the noteOn value?
-        newNoteArrived = false;
+        newNoteOnArrived = false;
         return noteOn;
+    }
+
+    public NoteOff getNoteOff(){
+        newNoteOffArrived = false;
+        return noteOff;
+    }
+
+    public MetronomeTick getMetronomeTick(){
+        newMetronomeTickArrived = false;
+        return metronomeTick;
     }
 
     @Override
