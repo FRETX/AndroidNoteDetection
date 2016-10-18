@@ -210,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
                     //Stop play mode
                     processor.stop();
                     //Reset the playhead
-                    noteIterator = midi.getTracks().get(0).getEvents().iterator();
+                    noteIterator = midi.getTracks().get(1).getEvents().iterator();
                     //Set the next note
                     advanceMidiNote();
 
@@ -442,7 +442,6 @@ public class MainActivity extends AppCompatActivity {
                                             "You: "
                                     );
                                     if(pitch > -1){
-                                        //TODO: Check with actual guitar
                                         double playedNote = hzToMidiNote(pitch);
                                         double difference = Math.abs(currentMidiNote-playedNote);
                                         eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
@@ -503,6 +502,10 @@ public class MainActivity extends AppCompatActivity {
                                     mistakeLock = false;
                                     mistakeText.setText("Added mistakes: " + Integer.toString(mistakes));
                                 }
+                            } else {
+                                FretboardPosition fretboardPosition = midiNoteToFretboardPosition(currentMidiNote);
+                                fretboard.setFretboardPosition(fretboardPosition);
+                                fretboard.drawNotes = true;
                             }
                                 //correctText.setText(Integer.toString((int)Math.ceil((float)correctNotes / (float)totalNotes * 100)) + "%");
                                 correctText.setText(Integer.toString(correctNotes)+ "/" + Integer.toString(totalNotes) + " notes correctly played");
@@ -534,8 +537,12 @@ public class MainActivity extends AppCompatActivity {
             MidiEvent event = noteIterator.next();
             if(event instanceof NoteOn)
             {
-                currentMidiNote = ((NoteOn) event).getNoteValue();
-                break;
+                int noteValue = ((NoteOn) event).getNoteValue();
+                if(noteValue >= 40 && noteValue <= 68) {
+                    currentMidiNote = noteValue;
+                    totalNotes++;
+                    return;
+                }
             }
         }
     }
