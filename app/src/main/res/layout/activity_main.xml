@@ -12,6 +12,23 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="rocks.fretx.notedetection.MainActivity">
 
+    <RadioGroup xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:id="@+id/modeRadioGroup">
+    <RadioButton
+        android:text="Practice Mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/practiceRadio"/>
+        <RadioButton
+            android:text="Play Mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:id="@+id/playRadio"/>
+    </RadioGroup>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -24,11 +41,13 @@
         android:id="@+id/tempoText"
         android:textSize="24dp"
         android:text="Tempo: "
+        android:visibility="invisible"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
     <SeekBar
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:visibility="invisible"
         android:id="@+id/tempoSeek"
         android:minHeight="36dp"/>
     <TextView

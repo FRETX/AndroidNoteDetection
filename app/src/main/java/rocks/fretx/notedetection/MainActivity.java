@@ -9,7 +9,10 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -37,6 +40,7 @@ public class MainActivity extends AppCompatActivity {
     private Thread guiThread;
     private boolean processingIsRunning = false;
     protected PitchDetectorYin yin;
+    private boolean practiceMode = true;
 
     MidiFile midi;
     MidiProcessor processor;
@@ -51,6 +55,9 @@ public class MainActivity extends AppCompatActivity {
     TextView correctText;
     TextView mistakeText;
     TextView metronomeText;
+    RadioButton practiceRadio;
+    RadioButton playRadio;
+    RadioGroup modeRadioGroup;
     SeekBar tempoSeek;
     TextView tempoText;
     FretboardView fretboard;
@@ -61,11 +68,11 @@ public class MainActivity extends AppCompatActivity {
     boolean correctNoteLock;
     boolean mistakeLock = true;
 
+    Iterator<MidiEvent> noteIterator;
+
     private final double ERROR_THRESHOLD_IN_SEMITONES = 0.5;
     private final long CORRECT_NOTE_COUNTDOWN = 400;
 
-    //TODO: NoteOff events
-    //TODO: metronome
 
     //Activity Lifecycle
     @Override
@@ -74,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         //GUI
-        initGui();
+
 
         //MIDI Stuff
         loadMidi();
@@ -106,8 +113,13 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+        initGui();
+
     }
 
+
+    //TODO: reset play head on mode change
+    //work the modes into the GUI thread
     protected void onStart(){
         super.onStart();
         Log.d("onStart","method called");
@@ -154,7 +166,10 @@ public class MainActivity extends AppCompatActivity {
         correctText = (TextView) findViewById(R.id.correctText);
         mistakeText = (TextView) findViewById(R.id.mistakeText);
         metronomeText = (TextView) findViewById(R.id.metronomeText);
-
+        practiceRadio = (RadioButton) findViewById(R.id.practiceRadio);
+        playRadio = (RadioButton) findViewById(R.id.playRadio);
+        modeRadioGroup = (RadioGroup) findViewById(R.id.modeRadioGroup);
+        fretboard = (FretboardView) findViewById(R.id.fretboard);
         tempoSeek = (SeekBar) findViewById(R.id.tempoSeek);
         tempoSeek.setMax(200);
         tempoSeek.setProgress(100);
@@ -180,7 +195,37 @@ public class MainActivity extends AppCompatActivity {
                 changeTempo(progress);
             }
         });
-        fretboard = (FretboardView) findViewById(R.id.fretboard);
+
+        modeRadioGroup.clearCheck();
+        modeRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener()
+        {
+            @Override
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                Log.d("RadioGroup OnChecked",Integer.toString(checkedId));
+                if(checkedId == R.id.practiceRadio){
+                    Log.d("Practice Mode","enabled");
+                    practiceMode = true;
+                    tempoSeek.setVisibility(View.INVISIBLE);
+                    tempoText.setVisibility(View.INVISIBLE);
+                    //Stop play mode
+                    processor.stop();
+                    //Reset the playhead
+                    noteIterator = midi.getTracks().get(0).getEvents().iterator();
+                    //Set the next note
+                    advanceMidiNote();
+
+                } else if(checkedId == R.id.playRadio){
+                    practiceMode = false;
+                    tempoSeek.setVisibility(View.VISIBLE);
+                    tempoText.setVisibility(View.VISIBLE);
+                    Log.d("Play Mode","enabled");
+                    processor.reset();
+                    processor.start();
+                }
+            }
+        });
+        practiceRadio.setChecked(true);
+        
         mistakeText.setText("Added mistakes: " + Integer.toString(mistakes));
     }
 
@@ -291,7 +336,6 @@ public class MainActivity extends AppCompatActivity {
                 i++;
             }
         }
-
     }
 
     private void changeTempo(int targetTempoPercentage){
@@ -392,9 +436,38 @@ public class MainActivity extends AppCompatActivity {
 //                                    }
 //                                }
 
-                                //TODO:There's a small chance eventDisplayer.midiEvent changes to e.g. Metronome before you can copy & cast it as NoteOn and the app crashes
-                                //
+                                float pitch = yin.medianPitch;
+                                if(currentMidiNote > -1){
+                                    eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
+                                            "You: "
+                                    );
+                                    if(pitch > -1){
+                                        //TODO: Check with actual guitar
+                                        double playedNote = hzToMidiNote(pitch);
+                                        double difference = Math.abs(currentMidiNote-playedNote);
+                                        eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
+                                                "You: " + midiNoteToName(Math.round((float)playedNote))
+                                        );
 
+                                        if(practiceMode == false){
+                                            if(difference < ERROR_THRESHOLD_IN_SEMITONES && timeLeftForCorrectNote > 0 && correctNoteLock){
+                                                correctNotes++;
+                                                correctNoteLock = false;
+                                            }
+
+                                        } else {
+                                            if(difference < ERROR_THRESHOLD_IN_SEMITONES){
+                                                correctNotes++;
+                                                advanceMidiNote();
+                                            }
+                                        }
+                                    } else{
+                                        //fretboard.playingCorrectly = false;
+                                    }
+                                }
+
+
+                            if(practiceMode == false){
                                 if(eventDisplayer.newMetronomeTickArrived){
                                     MetronomeTick metronomeTick = eventDisplayer.getMetronomeTick();
                                     metronomeText.setText("x");
@@ -411,7 +484,7 @@ public class MainActivity extends AppCompatActivity {
                                     eventText.setText("Target: " + midiNoteToName(noteon.getNoteValue()) + "\n" +
 //                                            new DecimalFormat("#.##").format(midiNoteToHz(noteon.getNoteValue() )) + " Hz" + "\n" +
 //                                            "String: " + fretboardPosition.getString() + " Fret: " + fretboardPosition.getFret()
-                                                    "You: ");
+                                            "You: ");
                                     totalNotes++;
                                     correctNoteLock = true;
                                     noteTimer.start();
@@ -425,34 +498,12 @@ public class MainActivity extends AppCompatActivity {
                                         fretboard.drawNotes = false;
                                     }
                                 }
-
-                                float pitch = yin.medianPitch;
-                                if(currentMidiNote > -1){
-                                    if(pitch > -1){
-                                        //TODO: Check with actual guitar
-                                        double playedNote = hzToMidiNote(pitch);
-                                        double difference = Math.abs(currentMidiNote-playedNote);
-                                        if(difference < ERROR_THRESHOLD_IN_SEMITONES && timeLeftForCorrectNote > 0 && correctNoteLock){
-                                            //fretboard.playingCorrectly = true;
-                                            //TODO: make it flash green for a small amount of time
-                                            correctNotes++;
-                                            correctNoteLock = false;
-                                        }
-
-                                        eventText.setText("Target: " + midiNoteToName(currentMidiNote) + "\n" +
-                                                "You: " + midiNoteToName(Math.round((float)playedNote))
-                                        );
-                                    } else{
-                                        //fretboard.playingCorrectly = false;
-                                    }
-                                }
-
                                 if(currentMidiNote == -1 && pitch > -1 && mistakeLock){
                                     mistakes++;
                                     mistakeLock = false;
                                     mistakeText.setText("Added mistakes: " + Integer.toString(mistakes));
                                 }
-
+                            }
                                 //correctText.setText(Integer.toString((int)Math.ceil((float)correctNotes / (float)totalNotes * 100)) + "%");
                                 correctText.setText(Integer.toString(correctNotes)+ "/" + Integer.toString(totalNotes) + " notes correctly played");
 
@@ -469,10 +520,24 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
-        processor.start();
+        if(practiceMode == false) {
+            processor.start();
+        }
         //TODO: MidiProcessor spawns a new thread with no reference everytime you call this, so those threads can't be killed
         guiThread.start();
 
+    }
+
+    private void advanceMidiNote(){
+        while(noteIterator.hasNext())
+        {
+            MidiEvent event = noteIterator.next();
+            if(event instanceof NoteOn)
+            {
+                currentMidiNote = ((NoteOn) event).getNoteValue();
+                break;
+            }
+        }
     }
 
     private void startProcessing(){
