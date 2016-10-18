@@ -225,7 +225,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         practiceRadio.setChecked(true);
-        
+
         mistakeText.setText("Added mistakes: " + Integer.toString(mistakes));
     }
 
